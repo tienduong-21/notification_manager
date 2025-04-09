@@ -1,17 +1,18 @@
 class Notification {
-    constructor({ title, content, startTime, endTime, userType }) {
+    constructor = ({ title, content, startTime, endTime, userType, userEmail }) => {
         this.id = Date.now().toString();
         this.title = title;
         this.content = content;
         this.startTime = startTime;
         this.endTime = endTime;
         this.userType = userType;
+        this.userEmail = userEmail;
         this.status = 'PENDING'; // PENDING, SENT, FAILED
         this.createdAt = new Date().toISOString();
-    }
+    };
 
-    validate() {
-        if (!this.title || !this.content || !this.startTime || !this.endTime || !this.userType) {
+    validate = () => {
+        if (!this.title || !this.content || !this.startTime || !this.endTime || !this.userType || !this.userEmail) {
             throw new Error('Missing required fields');
         }
         
@@ -22,7 +23,7 @@ class Notification {
         }
         
         return true;
-    }
+    };
 }
 
 module.exports = Notification; 

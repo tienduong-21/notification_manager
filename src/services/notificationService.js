@@ -1,33 +1,33 @@
-const { dynamodb, TABLE_NAME } = require('../config/aws');
 const Notification = require('../models/notification');
+const notificationDB = require('../db/notificationService');
 
 class NotificationService {
-    async create(notificationData) {
+    create = async (notificationData) => {
         const notification = new Notification(notificationData);
         notification.validate();
 
-        await dynamodb.put({
-            TableName: TABLE_NAME,
-            Item: notification
-        }).promise();
+        return notificationDB.create(notification);
+    };
 
-        return notification;
-    }
+    getAll = async () => {
+        return notificationDB.getAll();
+    };
 
-    async getAll() {
-        const result = await dynamodb.scan({
-            TableName: TABLE_NAME
-        }).promise();
-        return result.Items;
-    }
+    getById = async (id) => {
+        return notificationDB.getById(id);
+    };
 
-    async getById(id) {
-        const result = await dynamodb.get({
-            TableName: TABLE_NAME,
-            Key: { id }
-        }).promise();
-        return result.Item;
-    }
+    getByUserEmail = async (userEmail) => {
+        return notificationDB.getByUserEmail(userEmail);
+    };
+
+    getPendingNotifications = async () => {
+        return notificationDB.getPendingNotifications();
+    };
+
+    updateStatus = async (id, status) => {
+        return notificationDB.updateStatus(id, status);
+    };
 }
 
 module.exports = new NotificationService(); 

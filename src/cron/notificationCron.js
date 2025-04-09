@@ -1,6 +1,6 @@
 const cron = require('node-cron');
-const { dynamodb, TABLE_NAME } = require('../config/aws');
-const { broadcastMessage } = require('../config/websocket');
+const notificationService = require('../services/notificationService');
+const websocketService = require('../websocket/websocketService');
 
 class NotificationCron {
     constructor() {
@@ -8,68 +8,42 @@ class NotificationCron {
         this.schedule = cron.schedule('* * * * *', () => this.checkAndSendNotifications());
     }
 
-    async checkAndSendNotifications() {
+    checkAndSendNotifications = async () => {
         try {
-            const now = new Date();
-            const result = await dynamodb.scan({
-                TableName: TABLE_NAME
-            }).promise();
+            // Get notifications that are due to be sent
+            const pendingNotifications = await notificationService.getPendingNotifications();
+            
+            for (const notification of pendingNotifications) {
+                try {
+                    // Send notification through WebSocket
+                    const success = await websocketService.sendNotification(notification);
 
-            for (const notification of result.Items) {
-                const startTime = new Date(notification.startTime);
-                const endTime = new Date(notification.endTime);
+                    // Update notification status
+                    await notificationService.updateStatus(
+                        notification.id,
+                        success ? 'SENT' : 'FAILED'
+                    );
 
-                // Check if current time is between start and end time
-                if (now >= startTime && now <= endTime && notification.status === 'PENDING') {
-                    try {
-                        // Send notification
-                        broadcastMessage(notification);
-
-                        // Update status to SENT
-                        await dynamodb.update({
-                            TableName: TABLE_NAME,
-                            Key: { id: notification.id },
-                            UpdateExpression: 'SET #status = :status',
-                            ExpressionAttributeNames: {
-                                '#status': 'status'
-                            },
-                            ExpressionAttributeValues: {
-                                ':status': 'SENT'
-                            }
-                        }).promise();
-
-                        console.log(`Notification ${notification.id} sent successfully`);
-                    } catch (error) {
-                        console.error(`Error sending notification ${notification.id}:`, error);
-                        // Update status to FAILED
-                        await dynamodb.update({
-                            TableName: TABLE_NAME,
-                            Key: { id: notification.id },
-                            UpdateExpression: 'SET #status = :status',
-                            ExpressionAttributeNames: {
-                                '#status': 'status'
-                            },
-                            ExpressionAttributeValues: {
-                                ':status': 'FAILED'
-                            }
-                        }).promise();
-                    }
+                    console.log(`Notification ${notification.id} sent successfully to ${notification.userEmail}`);
+                } catch (error) {
+                    console.error(`Error sending notification ${notification.id}:`, error);
+                    await notificationService.updateStatus(notification.id, 'FAILED');
                 }
             }
         } catch (error) {
             console.error('Error in notification cron job:', error);
         }
-    }
+    };
 
-    start() {
+    start = () => {
         this.schedule.start();
         console.log('Notification cron job started');
-    }
+    };
 
-    stop() {
+    stop = () => {
         this.schedule.stop();
         console.log('Notification cron job stopped');
-    }
+    };
 }
 
 module.exports = new NotificationCron(); 
